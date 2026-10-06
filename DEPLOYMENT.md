@@ -28,6 +28,8 @@ Never add database credentials to source files, GitHub repository variables, or 
 4. Open [Initialize cloud MySQL](https://github.com/shaik266/Madarsa_Project/actions/workflows/setup-cloud-database.yml).
 5. Select **Run workflow**, choose branch **v2**, and run it once for the new database.
 
+If the workflow is not visible because it only exists on `v2`, use GitHub's web editor to [create `.github/cloud-database-request.txt` on v2](https://github.com/shaik266/Madarsa_Project/new/v2?filename=.github%2Fcloud-database-request.txt), enter a request date or note, and commit directly to `v2`. Creating or editing that file triggers database initialization in the cloud after you configure the secrets. Ordinary app commits do not run database setup.
+
 This workflow uses TLS with certificate verification. The database must allow connections from GitHub-hosted runners. If your provider restricts network access, configure its allowed addresses or run setup using its own cloud shell. Setup adds schema and sample data; it does not reset the database.
 
 ## 3. Deploy the API on Render

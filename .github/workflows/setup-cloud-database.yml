@@ -1,6 +1,9 @@
 name: Initialize cloud MySQL
 
 on:
+  push:
+    branches: [v2]
+    paths: [.github/cloud-database-request.txt]
   workflow_dispatch:
 
 permissions:
