@@ -1,0 +1,44 @@
+name: Initialize cloud MySQL
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-database-setup
+  cancel-in-progress: false
+
+jobs:
+  setup:
+    if: github.ref == 'refs/heads/v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: cloud-database
+    env:
+      DB_HOST: ${{ secrets.DB_HOST }}
+      DB_PORT: ${{ secrets.DB_PORT }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+      DB_CA_CERT: ${{ secrets.DB_CA_CERT }}
+      DB_SSL: 'true'
+      DB_SSL_REJECT_UNAUTHORIZED: 'true'
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Check database configuration
+        run: |
+          for key in DB_HOST DB_PORT DB_USER DB_PASSWORD DB_NAME; do
+            if [ -z "${!key}" ]; then
+              echo "::error::Missing $key in the cloud-database environment secrets."
+              exit 1
+            fi
+          done
+      - run: npm ci
+      - name: Create schema and sample data
+        run: npm run db:setup

@@ -2,6 +2,7 @@ services:
   - type: web
     name: abd-madarsa-api
     runtime: node
+    branch: v2
     plan: free
     buildCommand: npm ci
     startCommand: npm run server
@@ -9,6 +10,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: NODE_VERSION
+        value: 22.23.3
       - key: DB_HOST
         sync: false
       - key: DB_PORT
@@ -19,7 +22,13 @@ services:
         sync: false
       - key: DB_NAME
         sync: false
-      - key: FRONTEND_URL
+      - key: DB_SSL
+        value: true
+      - key: DB_SSL_REJECT_UNAUTHORIZED
+        value: true
+      - key: DB_CA_CERT
         sync: false
+      - key: FRONTEND_URL
+        value: https://shaik266.github.io
       - key: SETUP_TOKEN
         sync: false

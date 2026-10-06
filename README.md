@@ -16,4 +16,4 @@ Backend: `http://localhost:3001`
 
 ## Deployment
 
-See [DEPLOYMENT.md](DEPLOYMENT.md) for the free hosting plan using Vercel, Render, and Aiven MySQL.
+See [DEPLOYMENT.md](DEPLOYMENT.md) to build and test in GitHub Actions, publish the frontend to GitHub Pages, and run the backend and MySQL in the cloud. No local backend is required.

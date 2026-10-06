@@ -1,88 +1,79 @@
-# Free Hosting Deployment
+# Cloud deployment from v2
 
-This project needs three hosted parts:
+The frontend builds and deploys in GitHub Actions. The API runs on Render and uses a hosted MySQL database. You do not need Node.js or MySQL installed on your computer.
 
-- Frontend: Vercel free
-- Backend API: Render free web service
-- MySQL: Aiven free MySQL
+GitHub Pages serves static files; it cannot run the app's Node.js API or MySQL database. GitHub Actions runners are temporary build/test machines, so they cannot serve as an always-on backend.
 
-Google Drive cannot run this app because it cannot run Node.js or MySQL.
+## 1. Create a hosted MySQL database
 
-## 1. Create Aiven MySQL
+Use a hosted MySQL provider, such as Aiven. Copy the host, port, username, password, database name, and CA certificate from its dashboard. Use a new database for the sample app. The setup script creates tables, applies schema updates, and inserts demonstration data and accounts.
 
-1. Create an Aiven account.
-2. Create a free MySQL service. Do not create OpenSearch, PostgreSQL, Redis, or Kafka for this app.
-3. Copy these values from Aiven:
-   - host
-   - port
-   - user
-   - password
-   - database name
+Never add database credentials to source files, GitHub repository variables, or any `VITE_` variable. Vite embeds `VITE_` values into public frontend JavaScript.
 
-## 2. Deploy Backend On Render
+## 2. Initialize the database using GitHub Actions
 
-1. Push this repo to GitHub.
-2. In Render, create a new Web Service from the repo.
-3. Use:
-   - build command: `npm ci`
-   - start command: `npm run server`
-   - health check path: `/api/health`
-4. Add environment variables:
-   - `DB_HOST`
-   - `DB_PORT`
-   - `DB_USER`
-   - `DB_PASSWORD`
-   - `DB_NAME`
-   - `DB_SSL=true`
-   - `DB_SSL_REJECT_UNAUTHORIZED=false`
-   - `NODE_ENV=production`
-   - `FRONTEND_URL=https://your-vercel-app.vercel.app`
-   - `SETUP_TOKEN=make-a-long-random-value`
-5. Deploy.
-6. Open `https://your-render-backend.onrender.com/api/health`.
+1. Open [repository environments](https://github.com/shaik266/Madarsa_Project/settings/environments).
+2. Create an environment named `cloud-database`.
+3. Add these **environment secrets** using your database provider's connection details:
 
-## 3. Setup Cloud Database
+   | Secret | Value |
+   | --- | --- |
+   | `DB_HOST` | MySQL hostname |
+   | `DB_PORT` | MySQL port |
+   | `DB_USER` | MySQL username |
+   | `DB_PASSWORD` | MySQL password |
+   | `DB_NAME` | Existing database name, for example `defaultdb` |
+   | `DB_CA_CERT` | Provider's full PEM CA certificate, if required |
 
-If your Render plan has Shell access, you can run:
+4. Open [Initialize cloud MySQL](https://github.com/shaik266/Madarsa_Project/actions/workflows/setup-cloud-database.yml).
+5. Select **Run workflow**, choose branch **v2**, and run it once for the new database.
 
-```bash
-npm run db:setup
-```
+This workflow uses TLS with certificate verification. The database must allow connections from GitHub-hosted runners. If your provider restricts network access, configure its allowed addresses or run setup using its own cloud shell. Setup adds schema and sample data; it does not reset the database.
 
-On Render Hobby without Shell access, open this URL after the backend is deployed:
+## 3. Deploy the API on Render
 
-```text
-https://your-render-backend.onrender.com/api/setup/database?token=your-setup-token
-```
+1. In Render, create a **Blueprint** from `shaik266/Madarsa_Project`, choosing branch **v2**. The checked-in `render.yaml` selects `v2` for the API service.
+2. Enter the same database connection values when prompted.
+3. `DB_SSL=true` and `DB_SSL_REJECT_UNAUTHORIZED=true` are configured in the Blueprint. Supply `DB_CA_CERT` from your provider when required.
+4. The configured frontend origin is `https://shaik266.github.io`. CORS uses the origin only, without `/Madarsa_Project/` or a trailing slash.
+5. `SETUP_TOKEN` is only for the existing optional HTTP setup endpoint. You can leave it unset when using the GitHub database setup workflow.
+6. Deploy the service and copy its actual HTTPS URL from Render. Do not assume the service name is its final hostname.
+7. Open `https://YOUR-ACTUAL-BACKEND.onrender.com/api/health` and check that it returns `"ok": true`.
 
-This creates tables and seed data in Aiven MySQL without requiring Render Shell.
+The Blueprint runs `npm ci` and `npm run server`. Subsequent pushes to `v2` deploy the API through Render's Git integration.
 
-## 4. Deploy Frontend On Vercel
+## 4. Connect GitHub Pages to the API
 
-1. Import the same GitHub repo in Vercel.
-2. Framework should be Vite.
-3. Add environment variable:
-   - `VITE_API_BASE=https://your-render-backend.onrender.com/api`
-4. Deploy.
+1. Open [Actions variables](https://github.com/shaik266/Madarsa_Project/settings/variables/actions).
+2. Create a **repository variable** named `VITE_API_BASE` with the actual backend URL ending in `/api`, for example `https://YOUR-ACTUAL-BACKEND.onrender.com/api`.
+3. Open [Pages settings](https://github.com/shaik266/Madarsa_Project/settings/pages) and set **Source** to **GitHub Actions**.
+4. If the `github-pages` environment has deployment branch restrictions, allow **v2** in [environment settings](https://github.com/shaik266/Madarsa_Project/settings/environments).
+5. Open [Cloud checks and GitHub Pages](https://github.com/shaik266/Madarsa_Project/actions/workflows/cloud.yml), choose **Run workflow**, and select **v2**. GitHub may only show the manual Run workflow control once the workflow also exists on the default branch; if it is unavailable, push a commit to `v2` to trigger deployment.
 
-## 5. Final Checks
+The website will be published at:
 
-Open the Vercel URL and login:
+**https://shaik266.github.io/Madarsa_Project/**
 
-- Admin: `abdullahboss1900@gmail.com` / `Admin@1900`
-- Principal: `principal@madarsa.edu` / `Principal@123`
-- Teacher: `teacher@madarsa.edu` / `Teacher@123`
-- Student: `student@madarsa.edu` / `Student@123`
-- Parent: `parent@madarsa.edu` / `Parent@123`
+Every push to `v2` builds the frontend, tests the API against a temporary MySQL service, and publishes the frontend when both pass. Pull requests run the checks without deployment. The temporary MySQL database is discarded after testing; it is separate from your hosted database.
 
-Run this after backend is deployed:
+Until `VITE_API_BASE` is configured, cloud checks still run and the built frontend artifact can be downloaded from the workflow. Pages deployment is skipped to avoid publishing an app that cannot log in. After changing this variable, rerun the workflow or push a commit: Vite reads the API URL at build time.
 
-```bash
-API_BASE=https://your-render-backend.onrender.com/api npm run test:e2e
-```
+## Final checks
 
-## Free Tier Notes
+- Open the Pages URL and check that the logo and favicon load.
+- Confirm that the institution list loads and a seeded demonstration account can log in.
+- Check the backend health URL if login or data loading fails. A sleeping free backend can take time to start.
+- The setup script includes demonstration accounts; review account access before adding real student data.
 
-- Render free backend sleeps when idle, so first load can take around one minute.
-- Aiven free MySQL has small limits and is suitable for demo/small usage.
-- Upgrade backend/database before real production traffic.
+No database credentials are needed by the frontend or the Pages deployment job. The API end-to-end tests modify data, so the workflow runs them only against its disposable test database.
+
+## Alternative frontend hosting
+
+The existing Vercel configuration still works. Set `VITE_API_BASE` in Vercel and leave `VITE_BASE_PATH` unset to serve at `/`. Add the Vercel origin to the API's comma-separated `FRONTEND_URL` if using it alongside Pages.
+
+## References
+
+- [GitHub Pages: static hosting](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages)
+- [GitHub Pages custom workflows](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages)
+- [Vite deployment and project base paths](https://vite.dev/guide/static-deploy)
+- [Render Blueprint configuration](https://render.com/docs/blueprint-spec)

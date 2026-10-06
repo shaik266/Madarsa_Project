@@ -1,0 +1,123 @@
+name: Cloud checks and GitHub Pages
+
+on:
+  push:
+    branches: [v2]
+  pull_request:
+    branches: [main, v2]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloud-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+      VITE_BASE_PATH: /${{ github.event.repository.name }}/
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Validate cloud API URL
+        if: env.VITE_API_BASE != ''
+        run: |
+          node --input-type=module <<'NODE'
+          const url = new URL(process.env.VITE_API_BASE);
+          if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname.replace(/\/+$/, '') !== '/api') {
+            throw new Error('VITE_API_BASE must be an HTTPS URL ending in /api, without credentials, query, or fragment.');
+          }
+          NODE
+      - run: npm run build
+      - name: Upload frontend
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+      - name: Explain pending cloud configuration
+        if: env.VITE_API_BASE == ''
+        run: |
+          echo '### Frontend built; deployment is waiting for the cloud API' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Set the repository variable VITE_API_BASE to your hosted HTTPS backend URL ending in /api. See DEPLOYMENT.md. No local backend is required.' >> "$GITHUB_STEP_SUMMARY"
+
+  api-tests:
+    name: Test API with temporary MySQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: ci-only-password
+          MYSQL_DATABASE: madarsa_ci
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -pci-only-password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_USER: root
+      DB_PASSWORD: ci-only-password
+      DB_NAME: madarsa_ci
+      DB_SSL: 'false'
+      PORT: '3001'
+      API_BASE: http://127.0.0.1:3001/api
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run db:setup
+      - name: Start backend and run API tests
+        shell: bash
+        run: |
+          npm run server > "$RUNNER_TEMP/madarsa-api.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in {1..30}; do
+            if curl --fail --silent "$API_BASE/health" > /dev/null; then
+              ready=true
+              break
+            fi
+            sleep 2
+          done
+          if [ "$ready" != true ]; then
+            cat "$RUNNER_TEMP/madarsa-api.log"
+            exit 1
+          fi
+          npm run test:e2e || { cat "$RUNNER_TEMP/madarsa-api.log"; exit 1; }
+
+  deploy:
+    name: Deploy frontend to GitHub Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/v2' && vars.VITE_API_BASE != ''
+    needs: [build, api-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v6
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v5

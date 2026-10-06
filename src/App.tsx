@@ -287,7 +287,7 @@ function App() {
         <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-2 bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="p-8 bg-emerald-700 text-white">
             <div className="flex items-center gap-4 mb-6">
-              <img src="/madarsa-logo.png" alt="Madarsa Uloom Ul Quran Abdullagutta" className="h-12 w-12 shrink-0 rounded-md bg-white object-contain p-1 ring-1 ring-white/70" />
+              <img src={`${import.meta.env.BASE_URL}madarsa-logo.png`} alt="Madarsa Uloom Ul Quran Abdullagutta" className="h-12 w-12 shrink-0 rounded-md bg-white object-contain p-1 ring-1 ring-white/70" />
               <div className="min-w-0">
                 <h1 className="text-3xl font-bold leading-tight">Madarsa Management</h1>
                 <p className="text-emerald-50 mt-2">Secure access for students, parents, teachers, principals, and admins.</p>
@@ -413,7 +413,7 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
-              <img src="/madarsa-logo.png" alt="Madarsa Uloom Ul Quran Abdullagutta" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain p-1 ring-1 ring-emerald-200" />
+              <img src={`${import.meta.env.BASE_URL}madarsa-logo.png`} alt="Madarsa Uloom Ul Quran Abdullagutta" className="h-9 w-9 shrink-0 rounded-md bg-white object-contain p-1 ring-1 ring-emerald-200" />
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Madarsa Management</h1>
                 <p className="text-sm text-gray-600">Academic Excellence System</p>
